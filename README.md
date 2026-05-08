@@ -8,7 +8,7 @@ Each image is sent as a separate request, so context does not accumulate across 
 ## Clone
 
 ```text
-git clone <URL_DEL_REPOSITORIO>
+git clone https://github.com/Mixomo/LM_Studio_Server_Batch_Image_Captioner.git
 ```
 
 ## Install
