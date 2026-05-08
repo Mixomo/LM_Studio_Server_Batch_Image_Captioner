@@ -41,6 +41,9 @@ Double-click:
 http://127.0.0.1:1234 #The URL may vary from system to system
 ```
 
+> [!TIP]
+> Under the **"Custom Fields"** options in the **Inference** tab of LM Studio, you can deactivate the model's **reasoning mode** / "Enable Thinking" (if supported). This will increase captioning speed at the cost of lower description quality.
+
 ## App Parameters
 
 Defaults:
