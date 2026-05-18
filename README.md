@@ -1,15 +1,8 @@
-# LM Studio Server Batch Image Captioner
+# llama.cpp Native Batch Image Captioner
 
-Minimal CustomTkinter app for captioning many images through LM Studio's local OpenAI-compatible server to create training datasets for text-to-image models such as Flux, Qwen, Z-Image, Ernie Image, etc.. 
-Each image is sent as a separate request, so context does not accumulate across the batch.
+Minimal CustomTkinter app for captioning many images directly through `llama-cpp-python`, without running LM Studio as a local server. Each image is sent as a separate request, so context does not accumulate across the batch.
 
 ![GUI](assets/GUI.png)
-
-## Clone
-
-```text
-git clone https://github.com/Mixomo/LM_Studio_Server_Batch_Image_Captioner.git
-```
 
 ## Install
 
@@ -19,7 +12,33 @@ Double-click:
 1_install.bat
 ```
 
-The installer uses `uv`. If `uv` is missing, it tries to install it automatically with `winget`, refreshes common Windows PATH locations, and runs `uv sync`
+The installer uses `uv`. If `uv` is missing, it tries to install it automatically with `winget`, then runs `uv sync`.
+
+After that it installs `llama-cpp-python` as automatically as possible:
+
+1. Detects the Python wheel tag used by `uv`, such as `cp310`, `cp311`, or `cp312`.
+2. Detects the CUDA version from `nvidia-smi`, `nvcc`, `CUDA_PATH`, or `CUDA_HOME`.
+3. Queries the latest JamePeng releases from:
+
+```text
+https://github.com/JamePeng/llama-cpp-python/releases/
+```
+
+4. Installs the best matching Windows `win_amd64` wheel directly with `uv pip install <wheel-url>`.
+
+Manual/offline installs are still supported. Put a wheel in:
+
+```text
+wheels\llama_cpp_python*.whl
+```
+
+Or set:
+
+```text
+LLAMA_CPP_PYTHON_WHEEL=C:\path\to\llama_cpp_python.whl
+```
+
+If CUDA or a matching release cannot be detected, the installer falls back to the standard PyPI `llama-cpp-python` package. On Windows this may compile from source and can be slower or fail if build tools/CUDA are missing.
 
 ## Run
 
@@ -29,57 +48,42 @@ Double-click:
 2_run.bat
 ```
 
-## LM Studio Setup
+The runner uses `uv run --no-sync` so the CUDA wheel installed by `1_install.bat` is not replaced or removed by a later project sync.
 
-1. Install LM Studio from `https://lmstudio.ai`.
-2. Download a vision-capable model. (It is recommended to choose the GGUF format options, which offer different levels of quantization depending on the amount of VRAM your GPU can handle, at the expense of lower quality). 
-3. Load the model in the Developer tab and confirm it is `READY`.
-4. In LM Studio's Inference panel, configure your preset, system prompt, custom fields, sampling, max tokens, and structured output.
-5. Start the local server. Default base URL is:
+## Model Setup
 
-```text
-http://127.0.0.1:1234 #The URL may vary from system to system
-```
+Use a vision-capable GGUF model and, when the model requires it, the matching multimodal projector file (`mmproj`).
 
-> [!TIP]
-> Under the **"Custom Fields"** options in the **Inference** tab of LM Studio, you can deactivate the model's **reasoning mode** / "Enable Thinking" (if supported). This will increase captioning speed at the cost of lower description quality.
-
-## App Parameters
-
-Defaults:
+Common fields:
 
 ```text
-
-#The URLs may vary from system to system
-
-API base:   http://127.0.0.1:1234
-Chat URL:   http://127.0.0.1:1234/v1/chat/completions
-Models URL: http://127.0.0.1:1234/v1/models
-Model:      google/gemma-4-26b-a4b #Example model
+Model GGUF:  path to the main .gguf model, selected with Browse
+mmproj:      path to the matching mmproj .gguf or .bin file, selected with Browse
+Chat format: model family used by llama-cpp-python
+GPU layers:  all to offload all possible layers to GPU
+Context:     prompt context size
+Threads:     empty lets llama.cpp choose
+Max tokens:  maximum caption length
 ```
 
-Complete / replace the app fields: Use the exact model id shown in LM Studio. If `Model` is empty, the app tries to auto-detect the first model from `Models URL`.
+When a model loads, the log prints the installed `llama-cpp-python` version, the source wheel URL, whether `ggml-cuda.dll` is present, and basic `nvidia-smi` GPU information. llama.cpp verbose loading logs are enabled so you can see whether layers are actually offloaded to CUDA.
 
-## Server Routes
+The app reads GGUF metadata to infer architecture, chat format, and matching `mmproj`, but it does not overwrite `Context`. The default runtime context stays at `4096` even when the GGUF reports a much larger trained context.
 
-OpenAI-compatible routes commonly exposed by LM Studio:
+Supported chat format presets in the app:
 
 ```text
-GET  /v1/models
-POST /v1/chat/completions
-POST /v1/completions
-POST /v1/embeddings
-POST /v1/responses
+llava-1-5
+llava-1-6
+moondream2
+nanollava
+llama-3-vision-alpha
+minicpm-v-2.6
+qwen2.5-vl
+qwen3-vl
 ```
 
-LM Studio API routes commonly exposed:
-
-```text
-GET  /api/v1/models
-POST /api/v1/chat/completions
-POST /api/v1/models/load
-POST /api/v1/models/unload
-```
+The model and `mmproj` must belong together. If captions are empty or the image is ignored, the most common causes are a mismatched projector, wrong chat format, or a model build without the needed multimodal support.
 
 ## Output
 
@@ -92,9 +96,19 @@ photo_001.txt
 
 Use `Overwrite existing .txt files to start fresh captioning` if you want to regenerate captions. Leave it unchecked to skip images that already have matching `.txt` files.
 
-## About system prompt
+## System Prompt
 
-You can ask a high-capacity LLM (Gemini, Grok, ChatGPT, Claude, etc.) to generate a custom system prompt for you, which you’ll then need to enter in the `system prompt` field under the `inference` tab in LM Studio (within the `developer` section, where you’ll start the server that this small app will read from).
+The text box in the app is the caption prompt that used to live in the LM Studio preset. Edit it before starting a batch if you want a different captioning style, trigger-word behavior, or output length.
+
+The prompt and log panes are vertically resizable. Drag the divider between them to give more space to either the prompt or runtime logs.
+
+Saved captions are cleaned of common model control tokens such as `<|channel>`, `<channel|>`, `<think>...</think>`, and leading `thought` / `analysis` markers.
+
+The app saves the last GUI configuration to `user_config.json` when you start a batch or close the window. New launches start empty; use `Load Last Session` to restore the previous session. Use `Clear Prompt` to empty the prompt box.
+
+## Example System Prompt:
+
+You can ask a high-capacity LLM (Gemini, Grok, ChatGPT, Claude, etc.) to generate a custom system prompt for you
 
 Here is an example system prompt (tested with google/gemma-4-26b-a4b model -  Other models may vary in their output) : 
 
@@ -167,5 +181,3 @@ Provide ONLY the final caption text. Do not include introductions, explanations,
 
 Now, analyze the provided image and the given trigger word, then generate the caption following all these guidelines.
 ```
-
-

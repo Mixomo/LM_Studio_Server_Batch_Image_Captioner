@@ -1,12 +1,11 @@
 [project]
-name = "lmstudio-batch-captioner"
+name = "llamacpp-native-batch-captioner"
 version = "0.1.0"
-description = "Minimal CustomTkinter batch image captioner for LM Studio."
-readme = "README_lmstudio_batch_captioner.md"
+description = "Minimal CustomTkinter batch image captioner for llama-cpp-python."
+readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "customtkinter>=5.2.2",
-    "requests>=2.31.0",
 ]
 
 [tool.uv]
