@@ -4,6 +4,12 @@ Minimal CustomTkinter app for captioning many images directly through `llama-cpp
 
 ![GUI](assets/GUI.png)
 
+## Clone
+
+```text
+git clone -b llama-ccp-native https://github.com/Mixomo/LM_Studio_Server_Batch_Image_Captioner.git
+```
+
 ## Install
 
 Double-click:
